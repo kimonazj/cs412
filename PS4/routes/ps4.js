@@ -4,52 +4,44 @@ const request = require('request');
 const fetch = require('node-fetch')
 const con = require("../config/config")
 
-/* part b. */
-router.post('/', function (req, res, next) {
-    return new Promise(((resolve, reject) => {
-        request(con.endpoint, {
-            method: "GET",
-            qs: {q: req.body.city, appid: con.key}
-        }, (err, response, body) => {
-            // request("http://api.openweathermap.org/data/2.5/weather?q=boston&appid=5d5f6a4060d0b3632c9ccaf5ff1a9159",{method:"GET"},(err,response,body)=>{
-            if (response.statusCode === 200) {
-                resolve(body);
-            } else {
-                reject(response)
-            }
-        })
-    })).then((result) => {
-        res.render("index", {title: JSON.parse(result)})
-    });
-});
+const redis = require('redis');
+const client = redis.createClient();
+const {promisify} = require('util');
+const getAsync = promisify(client.get).bind(client);
+const existsAsync = promisify(client.exists).bind(client);
+const setAsync = promisify(client.set).bind(client);
+const expireAsync = promisify(client.expire).bind(client);
 
-//part c
+
+//Redis hw used PS4 part c
 router.post('/', async function (req, res, next) {
-    const fx = await fetch(con.endpoint + "?q=" + req.body.city + "&appid" + con.key, {
-        method: "GET",
-    })
-    const result = await fx.json();
-    res.render("index", {title: result})
-})
+    let loc = req.body.city;
 
-//part d
-router.post("/", function (req, res, next) {
-    const delayed = function (callback) {
-        request(con.endpoint, {
+    if (await existsAsync(loc)) {
+        let locData = await getAsync(loc);
+        let response = {
+            locData: locData,
+            cached: true
+        }
+        res.send(response);
+
+    }else{
+        const fx = await fetch(con.endpoint + "?q=" + req.body.city + "&appid" + con.key, {
             method: "GET",
-            qs: {q: req.body.city, appid: con.key}
-        }, (err, response, body) => {
-            if (response.statusCode === 200) {
-                callback(body)
-            }
-            ;
         })
-        delayed(function (body) {
-            res.render("index", {title: JSON.parse(body)})
-        })
+        const locData = await fx.json();
 
+        await setAsync(loc, JSON.stringify(locData));
+        let response = {
+            locData: locData,
+            cached: false
+        }
+        await expireAsync(loc, 15);
+        res.send(response)
     }
 })
+
+
 
 
 module.exports = router;
