@@ -1,0 +1,11 @@
+<p>
+  searched city: {{city}}
+</p>
+<div *ngIf="json.result.query.length >1">
+  <ul>
+    <li><span>if cached:</span> {{json.cached}}</li>
+    <li *ngFor="let a of fakeArray; let index = index" > <a> {{index}}: {{json.searchResult.windlevel}}</a></li>
+  </ul>
+</div>
+
+<button (click)="SearchWeather(); visibility()">See the wind level of {{city}}</button>
